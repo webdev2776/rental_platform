@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,6 +5,11 @@ generator client {
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
+}
+
+enum AccountType {
+  OAUTH
+  PASSWORD
 }
 
 model User {
@@ -22,8 +21,12 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  updatedBy     String?   @db.ObjectId
+  deletedBy     String?   @db.ObjectId
 
   accounts Account[]
+  licenses DriversLicense[]
+  orders   Order[]
 }
 
 model Account {
@@ -39,9 +42,80 @@ model Account {
   scope             String?
   id_token          String? @db.String
   session_state     String?
+  updatedBy         String? @db.ObjectId
+  deletedBy         String? @db.ObjectId
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
+}
+
+model DriversLicense {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  dlNumber   String   @map("dl_number")
+  dlState    String   @map("dl_state")
+  dlExp      DateTime @map("dl_exp")
+  dlAddress  String   @map("dl_address")
+  dlImgFront String   @map("dl_img_front")
+  dlImgBack  String   @map("dl_img_back")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  updatedBy  String?  @db.ObjectId
+  deletedBy  String?  @db.ObjectId
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("drivers_licenses")
+}
+
+model Equipment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  equipmentId String   @unique
+  stock       Int
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedBy   String?  @db.ObjectId
+  deletedBy   String?  @db.ObjectId
+
+  rentals EquipmentRented[]
+}
+
+model Order {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  createdBy   String   @db.ObjectId // The user who created the order (admin or staff)
+  totalAmount Float    @default(0) @map("total_amount")
+  discount    Float    @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedBy   String?  @db.ObjectId
+  deletedBy   String?  @db.ObjectId
+
+  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items EquipmentRented[]
+
+  @@map("orders")
+}
+
+model EquipmentRented {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId      String   @db.ObjectId
+  equipmentId  String   @db.ObjectId
+  quantity     Int
+  pricePerUnit Float    @map("price_per_unit")
+  totalPrice   Float    @map("total_price") // (quantity * pricePerUnit)
+  timeFrom     DateTime @map("time_from")
+  timeTo       DateTime @map("time_to")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  updatedBy    String?  @db.ObjectId
+  deletedBy    String?  @db.ObjectId
+
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@map("equipment_rented")
 }
